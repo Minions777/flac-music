@@ -4,7 +4,6 @@ const { app, BrowserWindow, ipcMain, shell, dialog, Menu, Tray, nativeImage } = 
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
-const http = require('http');
 const { URL } = require('url');
 
 // ── Dev 模式检测 ──────────────────────────────────────────
@@ -51,6 +50,24 @@ function saveConfig(data) {
 let config = loadConfig();
 
 // ── 下载任务队列 ──────────────────────────────────────────
+// ── 日志工具 ────────────────────────────────────────────────
+const LOG_PATH = path.join(app.getPath('userData'), 'app.log');
+const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5 MB
+
+function _log(level, msg) {
+  const ts = new Date().toISOString();
+  const line = `[${ts}] [${level}] ${msg}\n`;
+  console[level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'log'](`[${level}] ${msg}`);
+  try {
+    if (fs.existsSync(LOG_PATH) && fs.statSync(LOG_PATH).size > MAX_LOG_SIZE) {
+      fs.writeFileSync(LOG_PATH, '');
+    }
+    fs.appendFileSync(LOG_PATH, line);
+  } catch (_) {}
+}
+
+const log = { info: (m) => _log('INFO', m), warn: (m) => _log('WARN', m), error: (m) => _log('ERROR', m) };
+
 class DownloadManager {
   constructor() {
     this.queue   = [];
@@ -60,6 +77,10 @@ class DownloadManager {
     this.idCtr   = 1;
     this.maxConcurrent = config.maxConcurrent || 3;
     this._handles = new Map();
+    this._pauseTimers = new Map();
+    this.PAUSE_TIMEOUT = 5 * 60 * 1000; // 5 分钟暂停后自动取消
+    this.MAX_RETRIES = 3;
+    this.RETRY_DELAYS = [2000, 5000, 15000]; // 指数退避
   }
 
   add(tracks) {
@@ -79,7 +100,8 @@ class DownloadManager {
       speed:    0,
       downloaded: 0,
       savePath: '',
-      error:    ''
+      error:    '',
+      retries:  0
     }));
     this.queue.push(...newTasks);
     this._flush();
@@ -94,10 +116,8 @@ class DownloadManager {
     }
   }
 
-  _download(task) {
-    task.status = 'downloading';
-    this._notify(task);
-
+  _ensureSavePath(task) {
+    if (task.savePath) return;
     const safeTitle  = task.title.replace(/[/\\:*?"<>|]/g, '_').replace(/[\x00-\x1f]/g, '');
     const safeArtist = task.artist.replace(/[/\\:*?"<>|]/g, '_').replace(/[\x00-\x1f]/g, '');
     const safeAlbum  = task.album.replace(/[/\\:*?"<>|]/g, '_').replace(/[\x00-\x1f]/g, '');
@@ -109,6 +129,21 @@ class DownloadManager {
     const ext = task.format.toLowerCase();
     const safeExt = /^[a-z0-9]+$/.test(ext) ? ext : 'bin';
     task.savePath = path.join(dir, `${safeTitle}.${safeExt}`);
+  }
+
+  _getExistingPartSize(task) {
+    const tmpPath = task.savePath + '.part';
+    try {
+      if (fs.existsSync(tmpPath)) return fs.statSync(tmpPath).size;
+    } catch (_) {}
+    return 0;
+  }
+
+  _download(task) {
+    task.status = 'downloading';
+    this._ensureSavePath(task);
+    this._notify(task);
+    log.info(`[Download] 开始下载: ${task.title} (${task.id})`);
 
     if (!task.url || task.url.startsWith('demo://')) {
       this._simulateDownload(task);
@@ -120,22 +155,57 @@ class DownloadManager {
       if (parsedUrl.protocol !== 'https:') {
         task.status = 'failed';
         task.error  = 'Only HTTPS URLs are supported';
+        log.error(`[Download] 非 HTTPS URL: ${task.url}`);
         this._finish(task);
         return;
       }
-      const req = https.get(task.url, { timeout: 30000 }, (res) => {
-        if (res.statusCode !== 200) {
+
+      const tmpPath = task.savePath + '.part';
+      const existingSize = this._getExistingPartSize(task);
+
+      const options = {
+        timeout: 30000,
+        headers: { 'User-Agent': 'FLAC-Music/2.4.1' }
+      };
+
+      // 断点续传：如果有 .part 文件，使用 Range 头
+      if (existingSize > 0) {
+        options.headers['Range'] = `bytes=${existingSize}-`;
+        log.info(`[Download] 断点续传: ${task.title}, 已有 ${existingSize} 字节`);
+      }
+
+      const req = https.get(task.url, options, (res) => {
+        // 处理断点续传响应
+        let total = 0;
+        let startByte = 0;
+        if (res.statusCode === 206) {
+          // 服务器支持断点续传
+          const contentRange = res.headers['content-range'];
+          if (contentRange) {
+            const match = contentRange.match(/bytes (\d+)-(\d+)\/(\d+)/);
+            if (match) {
+              startByte = parseInt(match[1], 10);
+              total = parseInt(match[3], 10);
+            }
+          }
+          task.size = total;
+        } else if (res.statusCode === 200) {
+          // 服务器不支持断点续传，从头开始
+          total = parseInt(res.headers['content-length'] || '0', 10);
+          task.size = total;
+          task.downloaded = 0;
+          existingSize = 0; // 忽略旧文件
+        } else {
           task.status = 'failed';
           task.error  = `HTTP ${res.statusCode}`;
+          log.error(`[Download] HTTP 错误 ${res.statusCode}: ${task.title}`);
           this._finish(task);
           return;
         }
-        const total = parseInt(res.headers['content-length'] || '0', 10);
-        task.size = total;
-        let received = 0;
+
+        let received = existingSize;
         const startTime = Date.now();
-        const tmpPath = task.savePath + '.part';
-        const file = fs.createWriteStream(tmpPath);
+        const file = fs.createWriteStream(tmpPath, existingSize > 0 ? { flags: 'a' } : {});
 
         const MAGIC_BYTES = {
           flac: [0x66, 0x4C, 0x61, 0x43],
@@ -158,57 +228,106 @@ class DownloadManager {
           } catch (_) { return false; }
         };
 
+        let paused = false;
+
         res.on('data', (chunk) => {
+          if (paused) return;
           received += chunk.length;
           task.downloaded = received;
           task.progress   = total > 0 ? Math.round((received / total) * 100) : 0;
           const elapsed   = (Date.now() - startTime) / 1000;
-          task.speed      = elapsed > 0 ? Math.round(received / elapsed) : 0;
+          task.speed      = elapsed > 0 ? Math.round((received - existingSize) / elapsed) : 0;
           this._notify(task);
         });
         res.pipe(file);
 
         file.on('finish', () => {
-          if (!verifyMagic(tmpPath, task.format)) {
-            try { fs.unlink(tmpPath, () => {}); } catch (_) {}
-            task.status = 'failed';
-            task.error  = '文件格式校验失败';
-            this._finish(task);
-            return;
-          }
-          fs.rename(tmpPath, task.savePath, (err) => {
-            if (err) {
+          // 断点续传时只验证完整文件的魔数
+          if (received === total || total === 0) {
+            if (!verifyMagic(tmpPath, task.format)) {
               try { fs.unlink(tmpPath, () => {}); } catch (_) {}
               task.status = 'failed';
-              task.error  = err.message;
+              task.error  = '文件格式校验失败';
+              log.error(`[Download] 格式校验失败: ${task.title}`);
+              this._finish(task);
+              return;
             }
-            this._finish(task);
-          });
+            fs.rename(tmpPath, task.savePath, (err) => {
+              if (err) {
+                try { fs.unlink(tmpPath, () => {}); } catch (_) {}
+                task.status = 'failed';
+                task.error  = err.message;
+                log.error(`[Download] 重命名失败: ${task.title} - ${err.message}`);
+              } else {
+                log.info(`[Download] 完成: ${task.title} -> ${task.savePath}`);
+              }
+              this._finish(task);
+            });
+          } else {
+            // 部分下载（暂停了），保留 .part 文件
+            task.downloaded = received;
+            log.info(`[Download] 部分下载: ${task.title} (${received}/${total})`);
+            this._notify(task);
+          }
         });
         file.on('error', (err) => {
-          try { fs.unlink(tmpPath, () => {}); } catch (_) {}
+          log.error(`[Download] 文件写入错误: ${task.title} - ${err.message}`);
           task.status = 'failed';
           task.error  = err.message;
           this._finish(task);
         });
 
-        this._handles.set(task.id, { req, res, file, abort: () => { req.destroy(); file.destroy(); } });
+        this._handles.set(task.id, {
+          req, res, file,
+          paused: false,
+          abort: () => {
+            paused = true;
+            req.destroy();
+            file.destroy();
+          }
+        });
       });
 
       req.on('error', (err) => {
-        task.status = 'failed';
-        task.error  = err.message;
-        this._finish(task);
+        log.error(`[Download] 请求错误: ${task.title} - ${err.message}`);
+        this._handleRetryOrFail(task, err.message);
       });
       req.on('timeout', () => {
-        task.status = 'failed';
-        task.error  = '连接超时';
+        log.error(`[Download] 连接超时: ${task.title}`);
         req.destroy();
-        this._finish(task);
+        this._handleRetryOrFail(task, '连接超时');
       });
     } catch (err) {
+      log.error(`[Download] 异常: ${task.title} - ${err.message}`);
+      this._handleRetryOrFail(task, err.message);
+    }
+  }
+
+  _handleRetryOrFail(task, errorMsg) {
+    if (task.retries < this.MAX_RETRIES && !task.url.startsWith('demo://')) {
+      task.retries++;
+      const delay = this.RETRY_DELAYS[Math.min(task.retries - 1, this.RETRY_DELAYS.length - 1)];
+      log.info(`[Download] 自动重试 ${task.retries}/${this.MAX_RETRIES}: ${task.title}，${delay}ms 后重试`);
+      task.status = 'queued';
+      task.error = `第 ${task.retries} 次重试中...`;
+      this._notify(task);
+
+      // 从 active 移除，延迟后重新加入队列
+      const idx = this.active.findIndex(t => t.id === task.id);
+      if (idx !== -1) this.active.splice(idx, 1);
+
+      this._pauseTimers.set(task.id, setTimeout(() => {
+        this._pauseTimers.delete(task.id);
+        task.error = '';
+        task.progress = 0;
+        task.downloaded = 0;
+        task.speed = 0;
+        this.queue.push(task);
+        this._flush();
+      }, delay));
+    } else {
       task.status = 'failed';
-      task.error  = err.message;
+      task.error = errorMsg;
       this._finish(task);
     }
   }
@@ -236,6 +355,7 @@ class DownloadManager {
         clearInterval(tick);
         task.status   = 'done';
         task.progress = 100;
+        log.info(`[Download] 演示下载完成: ${task.title}`);
         this._finish(task);
       }
     }, 400);
@@ -249,23 +369,46 @@ class DownloadManager {
       task.status = 'paused';
       const handle = this._handles.get(id);
       if (handle) {
-        if (handle.res && typeof handle.res.pause === 'function') handle.res.pause();
-        if (handle.file && typeof handle.file.pause === 'function') handle.file.pause();
+        handle.paused = true;
+        handle.abort();
       }
       this._notify(task);
+      log.info(`[Download] 已暂停: ${task.title} (${id})`);
+
+      // 暂停超时：5 分钟后自动取消
+      const timer = setTimeout(() => {
+        if (this._find(id) && this._find(id).status === 'paused') {
+          log.warn(`[Download] 暂停超时自动取消: ${task.title} (${id})`);
+          this.cancel(id);
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('task-finished', { id, status: 'failed', savePath: '', error: '暂停超时自动取消' });
+          }
+        }
+      }, this.PAUSE_TIMEOUT);
+      this._pauseTimers.set(`pause_${id}`, timer);
     }
   }
 
   resume(id) {
     const task = this._find(id);
     if (task && task.status === 'paused') {
-      task.status = 'downloading';
-      const handle = this._handles.get(id);
-      if (handle) {
-        if (handle.res && typeof handle.res.resume === 'function') handle.res.resume();
-        if (handle.file && typeof handle.file.resume === 'function') handle.file.resume();
+      // 清除暂停超时计时器
+      const pauseTimer = this._pauseTimers.get(`pause_${id}`);
+      if (pauseTimer) {
+        clearTimeout(pauseTimer);
+        this._pauseTimers.delete(`pause_${id}`);
       }
+
+      task.status = 'downloading';
+      task.speed = 0;
       this._notify(task);
+      log.info(`[Download] 恢复下载: ${task.title} (${id})`);
+
+      // 从 active 移除后重新下载（支持断点续传）
+      const idx = this.active.findIndex(t => t.id === id);
+      if (idx !== -1) this.active.splice(idx, 1);
+      this.active.push(task);
+      this._download(task);
     }
   }
 
@@ -273,6 +416,19 @@ class DownloadManager {
     const handle = this._handles.get(id);
     if (handle && handle.abort) handle.abort();
     this._handles.delete(id);
+
+    // 清除暂停超时计时器
+    const pauseTimer = this._pauseTimers.get(`pause_${id}`);
+    if (pauseTimer) {
+      clearTimeout(pauseTimer);
+      this._pauseTimers.delete(`pause_${id}`);
+    }
+    // 清除重试计时器
+    const retryTimer = this._pauseTimers.get(id);
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      this._pauseTimers.delete(id);
+    }
 
     // Clean up any .part file
     const task = this._find(id);
@@ -287,6 +443,7 @@ class DownloadManager {
     }
     const inQueue = this.queue.findIndex(t => t.id === id);
     if (inQueue !== -1) this.queue.splice(inQueue, 1);
+    log.info(`[Download] 已取消: ${task ? task.title : id} (${id})`);
   }
 
   _finish(task) {
@@ -353,12 +510,19 @@ async function searchMusic(keyword, page = 1) {
             resolve({ success: true, results, source: 'html' });
           }
         } catch (e) {
-          resolve({ success: false, error: e.message, results: getDemoResults(keyword) });
+          resolve({ success: false, error: e.message, results: getDemoResults(keyword), source: 'demo', warning: '解析失败，当前显示演示数据' });
         }
       });
     });
-    req.on('error', () => resolve({ success: true, results: getDemoResults(keyword), source: 'demo' }));
-    req.on('timeout', () => { req.destroy(); resolve({ success: true, results: getDemoResults(keyword), source: 'demo' }); });
+    req.on('error', () => {
+      log.warn(`[Search] 搜索失败，回退演示数据: ${keyword}`);
+      resolve({ success: true, results: getDemoResults(keyword), source: 'demo', warning: '搜索源暂不可用，当前显示演示数据' });
+    });
+    req.on('timeout', () => {
+      req.destroy();
+      log.warn(`[Search] 搜索超时，回退演示数据: ${keyword}`);
+      resolve({ success: true, results: getDemoResults(keyword), source: 'demo', warning: '搜索源连接超时，当前显示演示数据' });
+    });
   });
 }
 
@@ -375,7 +539,10 @@ function parseSearchResults(html, keyword) {
       i++;
     }
   }
-  if (results.length === 0) return getDemoResults(keyword);
+  if (results.length === 0) {
+    log.warn(`[Search] HTML 解析无结果，回退演示数据: ${keyword}`);
+    return getDemoResults(keyword).map(r => ({ ...r, _demoWarning: true }));
+  }
   return results;
 }
 
@@ -573,6 +740,48 @@ function registerIPC() {
   });
   ipcMain.handle('open-dir', () => { shell.openPath(config.downloadDir); return { ok: true }; });
 
+  ipcMain.handle('library-scan', () => {
+    const AUDIO_EXTS = new Set(['.flac', '.wav', '.mp3', '.aac', '.ape', '.dsd', '.ogg', '.wma', '.m4a']);
+    try {
+      const dir = config.downloadDir;
+      if (!fs.existsSync(dir)) return { ok: true, files: [] };
+      const files = [];
+      const scanDir = (currentDir, depth = 0) => {
+        if (depth > 4) return; // 最多递归 4 层
+        let entries;
+        try { entries = fs.readdirSync(currentDir, { withFileTypes: true }); } catch (_) { return; }
+        for (const entry of entries) {
+          const fullPath = path.join(currentDir, entry.name);
+          if (entry.isDirectory()) {
+            scanDir(fullPath, depth + 1);
+          } else if (entry.isFile()) {
+            const ext = path.extname(entry.name).toLowerCase();
+            if (AUDIO_EXTS.has(ext)) {
+              try {
+                const stat = fs.statSync(fullPath);
+                files.push({
+                  name: path.basename(entry.name, ext),
+                  ext: ext.slice(1).toUpperCase(),
+                  path: fullPath,
+                  size: stat.size,
+                  modified: stat.mtimeMs
+                });
+              } catch (_) {}
+            }
+          }
+        }
+      };
+      scanDir(dir);
+      // 按修改时间倒序排列，最多返回 500 个
+      files.sort((a, b) => b.modified - a.modified);
+      log.info(`[Library] 扫描到 ${files.length} 个音频文件`);
+      return { ok: true, files: files.slice(0, 500) };
+    } catch (err) {
+      log.error(`[Library] 扫描失败: ${err.message}`);
+      return { ok: false, error: err.message, files: [] };
+    }
+  });
+
   ipcMain.handle('system-info', () => ({
     platform: process.platform, arch: process.arch,
     version: app.getVersion(), electron: process.versions.electron, node: process.versions.node
@@ -597,9 +806,63 @@ function registerIPC() {
     return { ok: true };
   });
 
-  ipcMain.handle('update-check', () => {
-    // Placeholder: report current version as up-to-date
-    return { ok: true, upToDate: true, version: app.getVersion() };
+  ipcMain.handle('update-check', async () => {
+    const REPO = 'Minions777/flac-music';
+    const currentVersion = app.getVersion();
+    try {
+      const data = await new Promise((resolve, reject) => {
+        const req = https.get({
+          hostname: 'api.github.com',
+          path: `/repos/${REPO}/releases/latest`,
+          headers: { 'User-Agent': `FLAC-Music/${currentVersion}`, 'Accept': 'application/vnd.github+json' },
+          timeout: 10000
+        }, (res) => {
+          if (res.statusCode !== 200) {
+            res.resume();
+            reject(new Error(`HTTP ${res.statusCode}`));
+            return;
+          }
+          let body = '';
+          res.on('data', chunk => body += chunk);
+          res.on('end', () => {
+            try { resolve(JSON.parse(body)); }
+            catch (e) { reject(e); }
+          });
+        });
+        req.on('error', reject);
+        req.on('timeout', () => { req.destroy(); reject(new Error('timeout')); });
+      });
+
+      const latestVersion = (data.tag_name || '').replace(/^v/, '');
+      if (!latestVersion) {
+        return { ok: true, upToDate: true, version: currentVersion };
+      }
+
+      const compare = (a, b) => {
+        const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+        const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+        for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+          const da = pa[i] || 0, db = pb[i] || 0;
+          if (da !== db) return da - db;
+        }
+        return 0;
+      };
+
+      const isOutdated = compare(currentVersion, latestVersion) < 0;
+      log.info(`[Update] 当前: ${currentVersion}, 最新: ${latestVersion}, 需更新: ${isOutdated}`);
+      return {
+        ok: true,
+        upToDate: !isOutdated,
+        version: currentVersion,
+        latestVersion,
+        releaseUrl: data.html_url || `https://github.com/${REPO}/releases/latest`,
+        releaseNotes: data.body || '',
+        publishedAt: data.published_at || ''
+      };
+    } catch (err) {
+      log.warn(`[Update] 检查失败: ${err.message}`);
+      return { ok: false, upToDate: true, version: currentVersion, error: err.message };
+    }
   });
 }
 
