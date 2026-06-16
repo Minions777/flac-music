@@ -25,11 +25,14 @@ const $$ = sel => document.querySelectorAll(sel);
 async function init() {
   try {
     [state.config, state.sysInfo] = await Promise.all([api.configGet(), api.systemInfo()]);
-  } catch (_) {
+  } catch (err) {
     state.config  = { downloadDir: '~/Music', maxConcurrent: 3, defaultFormat: 'FLAC', defaultQuality: '24bit/96kHz', autoWriteMetadata: false, autoOrganize: true };
     state.sysInfo = { platform: 'win32', version: '2.4.1' };
+    console.error('[Init] 与主进程通信失败，使用默认配置:', err);
+    showConnectionError();
   }
 
+  setupGlobalErrorHandler();
   applyPlatform();
   applySettings();
   setupNav();
@@ -42,6 +45,32 @@ async function init() {
   setupModals();
   refreshDownloadList();
   refreshTasksFromMain();
+}
+
+// ── 全局错误边界 ─────────────────────────────────────────────
+function setupGlobalErrorHandler() {
+  // 捕获未处理的 Promise 异常
+  window.addEventListener('unhandledrejection', (event) => {
+    console.error('[Unhandled Rejection]', event.reason);
+    showToast('发生未处理异常，请查看日志', 'error', 4000);
+  });
+
+  // 捕获同步异常
+  window.addEventListener('error', (event) => {
+    console.error('[Error]', event.error || event.message);
+    showToast('发生错误，请查看日志', 'error', 4000);
+    event.preventDefault();
+  });
+}
+
+function showConnectionError() {
+  const banner = document.createElement('div');
+  banner.id = 'conn-error-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;padding:12px 20px;background:#d93025;color:#fff;font-size:13px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+  banner.innerHTML = '<strong>⚠ 与主进程通信断开</strong> — 部分功能可能不可用，请重启应用';
+  if (!document.getElementById('conn-error-banner')) {
+    document.body.prepend(banner);
+  }
 }
 
 // ── 平台适配 ─────────────────────────────────────────────────
@@ -157,6 +186,9 @@ async function doSearch() {
   $('result-toolbar').style.display     = 'none';
   $('quick-tags').style.display         = 'none';
   state.selectedTracks.clear();
+  // 清除行缓存，强制下次 renderTrackRows 全量重建
+  const cont = $('track-rows');
+  if (cont) delete cont.dataset.cachedIds;
 
   try {
     const res = await api.search(kw, 1);
@@ -169,6 +201,9 @@ async function doSearch() {
     const srcBadge = $('source-badge');
     srcBadge.textContent = res.source === 'demo' ? '演示数据' : '在线搜索';
     srcBadge.style.display = 'inline-block';
+    if (res.warning) {
+      showToast(res.warning, 'error', 5000);
+    }
     updateBatchBtn();
   } catch (err) {
     $('search-loading').style.display     = 'none';
@@ -180,7 +215,28 @@ async function doSearch() {
 function renderTrackRows() {
   const container = $('track-rows');
   if (!container) return;
+
+  // 增量更新：如果结果集未变化，仅更新选择态，避免全量重建
+  const currentIds = state.searchResults.map(t => String(t.id)).join(',');
+  const cachedIds  = container.dataset.cachedIds || '';
+  if (currentIds === cachedIds && container.children.length === state.searchResults.length) {
+    // 仅切换选中态
+    Array.from(container.children).forEach(row => {
+      const id = row.dataset.id;
+      const track = state.searchResults.find(t => String(t.id) === id);
+      if (!track) return;
+      const isSelected = state.selectedTracks.has(track.id);
+      row.classList.toggle('selected', isSelected);
+      const cb = row.querySelector('input[type="checkbox"]');
+      if (cb) cb.checked = isSelected;
+    });
+    const allChecked = state.searchResults.length > 0 && state.searchResults.every(t => state.selectedTracks.has(t.id));
+    $('th-check-all').checked = allChecked;
+    return;
+  }
+
   container.innerHTML = '';
+  container.dataset.cachedIds = currentIds;
 
   state.searchResults.forEach((track, idx) => {
     const isSelected = state.selectedTracks.has(track.id);
@@ -520,9 +576,8 @@ function setupIPC() {
   api.onConfirmClose(({ activeTasks }) => showCloseModal(activeTasks));
   api.onCheckUpdate(async () => {
     try {
-      const result = await window.flacMusic.updateCheck ? await window.flacMusic.updateCheck() : null;
-      if (result?.upToDate) showToast('已是最新版本', 'info');
-      else if (!result?.upToDate) showToast(`发现新版本: ${result?.version}`, 'success');
+      const result = window.flacMusic.updateCheck ? await window.flacMusic.updateCheck() : null;
+      handleUpdateResult(result);
     } catch (_) {}
   });
 }
@@ -574,10 +629,31 @@ function setupSettingsPage() {
     showToast('正在检查更新…', 'info', 2000);
     try {
       const r = await api.updateCheck();
-      if (r?.upToDate) showToast('已是最新版本', 'info');
-      else showToast(`发现新版本: ${r?.version || '未知'}`, 'success');
+      handleUpdateResult(r);
     } catch (_) { showToast('检查更新失败', 'error'); }
   });
+}
+
+function handleUpdateResult(r) {
+  if (!r || !r.ok) {
+    showToast(r?.error ? `检查更新失败: ${r.error}` : '检查更新失败', 'error', 5000);
+    return;
+  }
+  if (r.upToDate) {
+    showToast(`已是最新版本 (v${r.version})`, 'info');
+    return;
+  }
+  // 发现新版本：提示并可选打开下载页
+  const msg = `发现新版本 v${r.latestVersion}（当前 v${r.version}）`;
+  showToast(msg, 'success', 8000);
+  // 5 秒后自动打开发布页（用户可立即关闭 toast 跳过）
+  if (r.releaseUrl) {
+    setTimeout(() => {
+      if (confirm(`发现新版本 v${r.latestVersion}，是否前往下载？`)) {
+        api.openExternal(r.releaseUrl);
+      }
+    }, 100);
+  }
 }
 
 function applySettings() {
@@ -612,29 +688,61 @@ function setupLibraryPage() {
   });
 }
 
-function refreshLibrary() {
-  const doneItems = [...state.tasks.values()].filter(t => t.status === 'done');
+async function refreshLibrary() {
   const placeholder = $('lib-placeholder');
   const grid = $('lib-grid');
   if (!grid) return;
 
-  if (doneItems.length === 0) {
-    placeholder.style.display = 'flex';
-    grid.style.display        = 'none';
+  // 优先扫描真实文件系统
+  let files = [];
+  try {
+    const res = await api.libraryScan();
+    if (res && res.ok) files = res.files || [];
+  } catch (_) {
+    // 扫描失败时回退到内存任务
+  }
+
+  // 如果扫描为空，回退到本次会话完成的任务
+  if (files.length === 0) {
+    const doneItems = [...state.tasks.values()].filter(t => t.status === 'done');
+    if (doneItems.length === 0) {
+      placeholder.style.display = 'flex';
+      grid.style.display        = 'none';
+      return;
+    }
+    placeholder.style.display = 'none';
+    grid.style.display        = 'grid';
+    grid.innerHTML = doneItems.map(item => `
+      <div class="lib-item">
+        <div class="lib-cover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        </div>
+        <div class="lib-name" title="${esc(item.title)}">${esc(item.title)}</div>
+        <div class="lib-artist">${esc(item.artist)}</div>
+      </div>
+    `).join('');
     return;
   }
 
   placeholder.style.display = 'none';
   grid.style.display        = 'grid';
-  grid.innerHTML = doneItems.map(item => `
-    <div class="lib-item">
+  grid.innerHTML = files.map(f => `
+    <div class="lib-item" title="${esc(f.path)}">
       <div class="lib-cover">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="36" height="36"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
       </div>
-      <div class="lib-name" title="${esc(item.title)}">${esc(item.title)}</div>
-      <div class="lib-artist">${esc(item.artist)}</div>
+      <div class="lib-name">${esc(f.name)}</div>
+      <div class="lib-artist">${esc(f.ext)} · ${formatSize(f.size)}</div>
     </div>
   `).join('');
+}
+
+function formatSize(bytes) {
+  if (!bytes || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let i = 0;
+  while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+  return `${bytes.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
 }
 
 // ── 模态框 ────────────────────────────────────────────────────
