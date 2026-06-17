@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# 取消同分支的旧运行 — 节省 CI 分钟
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION_DEFAULT: '20'
+
+jobs:
+  test:
+    name: Lint + Test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # 浅克隆，显著加速 checkout
+          fetch-depth: 1
+
+      - name: Setup Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          # 关键优化: 按 package-lock.json 哈希缓存 node_modules
+          # 当 lock 文件不变时, 缓存命中, 省去 60-80% 安装时间
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund --prefer-offline
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Generate coverage report
+        run: npm run test:coverage
+        continue-on-error: true  # 覆盖率暂时不阻塞, 留 PR 评审处理
+
+      - name: Upload coverage to Codecov
+        if: matrix.node == 22 && github.event_name == 'push'
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: false
+
+      - name: Run integration tests
+        run: npm run test:integration
+        continue-on-error: true  # 集成测试可能在 CI 环境因网络/IO 限制失败
+
+      - name: Bundle size budget
+        run: npm run size
+        continue-on-error: true  # 体积警告不阻塞, 留 PR 评审处理
+
+      # ── 缓存清理: 大文件不缓存, 避免浪费存储 ──────────────
+      - name: Cleanup npm cache
+        if: always()
+        run: npm cache clean --force

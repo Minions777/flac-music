@@ -1,0 +1,112 @@
+{
+  "app": {
+    "name": "FLAC Music",
+    "version": "Version"
+  },
+  "nav": {
+    "search": "Search",
+    "downloads": "Downloads",
+    "library": "Library",
+    "settings": "Settings"
+  },
+  "search": {
+    "title": "Search Music",
+    "subtitle": "Search lossless library, supports batch download",
+    "placeholder": "Search artist, album, or track…",
+    "button": "Search",
+    "loading": "Searching…",
+    "empty": "Enter a keyword to start",
+    "emptyHint": "Supports FLAC, WAV, MP3, AAC, APE, DSD",
+    "resultCount": "Found {n} matching tracks",
+    "sourceDemo": "Demo Data",
+    "sourceOnline": "Online Search",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "batchDownload": "Download ({n})"
+  },
+  "downloads": {
+    "title": "Downloads",
+    "empty": "No active downloads",
+    "emptyHint": "Pick tracks from the Search page to start",
+    "pauseAll": "Pause All",
+    "resumeAll": "Resume All",
+    "clearDone": "Clear Done",
+    "openDir": "Open Folder",
+    "stats": {
+      "active": "Active",
+      "queued": "Queued",
+      "done": "Done",
+      "failed": "Failed",
+      "speed": "Speed"
+    },
+    "actions": {
+      "pause": "Pause",
+      "resume": "Resume",
+      "retry": "Retry",
+      "cancel": "Cancel",
+      "reveal": "Show in Folder"
+    },
+    "status": {
+      "downloading": "Downloading",
+      "queued": "Queued",
+      "done": "Done",
+      "failed": "Failed",
+      "paused": "Paused"
+    },
+    "toast": {
+      "pausedAll": "All tasks paused",
+      "resumedAll": "All tasks resumed"
+    }
+  },
+  "library": {
+    "title": "Local Library",
+    "openDir": "Open Folder",
+    "empty": "No downloaded files yet",
+    "emptyHint": "Completed downloads will be organized here",
+    "goSearch": "Search & Download"
+  },
+  "settings": {
+    "title": "Settings",
+    "download": "Download",
+    "downloadDir": "Download Folder",
+    "changeDir": "Change",
+    "maxConcurrent": "Max Concurrency",
+    "maxConcurrentDesc": "Number of simultaneous downloads",
+    "defaultFormat": "Default Format",
+    "defaultFormatDesc": "Default audio format for new tasks",
+    "defaultQuality": "Default Quality",
+    "defaultQualityDesc": "Preferred download quality",
+    "fileMgmt": "File Management",
+    "autoOrganize": "Auto-organize",
+    "autoOrganizeDesc": "Create subfolders by artist/album",
+    "autoMetadata": "Write Metadata",
+    "autoMetadataDesc": "Embed cover, title, artist after download",
+    "about": "About",
+    "checkUpdate": "Check for Updates",
+    "officialSite": "Official Site",
+    "language": "Language"
+  },
+  "toast": {
+    "searchFailed": "Search failed: {err}",
+    "downloadFailed": "Add to queue failed: {err}",
+    "queuedN": "Added {n} track(s) to download queue",
+    "downloadedOne": "「{title}」downloaded",
+    "globalError": "An error occurred, check the log",
+    "unhandled": "Unhandled exception, check the log"
+  },
+  "modal": {
+    "closeTitle": "Confirm Quit",
+    "closeMsg": "{n} download(s) still in progress, quitting will interrupt them.",
+    "cancel": "Cancel",
+    "forceQuit": "Force Quit"
+  },
+  "titlebar": {
+    "min": "Minimize",
+    "max": "Maximize",
+    "close": "Close"
+  },
+  "globalSpeed": "Global Speed",
+  "telemetry": {
+    "banner": "⚠ Lost connection to main process — some features may be unavailable, please restart"
+  }
+}

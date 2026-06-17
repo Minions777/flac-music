@@ -1,327 +1,461 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https:; object-src 'none'; base-uri 'none';" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FLAC Music</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body class="platform-unknown">
-
-<!-- ── 自定义标题栏（Windows 用） ─────────────────────────── -->
-<div id="titlebar" class="titlebar win-only">
-  <div class="titlebar-drag">
-    <div class="titlebar-logo">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
-      FLAC Music
-    </div>
-  </div>
-  <div class="titlebar-ctrls">
-    <button class="tb-btn" id="tb-min" title="最小化">
-      <svg width="10" height="1" viewBox="0 0 10 1"><line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" stroke-width="1.2"/></svg>
-    </button>
-    <button class="tb-btn" id="tb-max" title="最大化">
-      <svg width="10" height="10" viewBox="0 0 10 10"><rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
-    </button>
-    <button class="tb-btn tb-close" id="tb-close" title="关闭">
-      <svg width="10" height="10" viewBox="0 0 10 10"><line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.4"/><line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.4"/></svg>
-    </button>
-  </div>
-</div>
-
-<!-- ── 主布局 ─────────────────────────────────────────────── -->
-<div class="app-layout">
-
-  <!-- 侧边栏 -->
-  <nav class="sidebar" id="sidebar">
-    <div class="sidebar-logo mac-only">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
-      <span>FLAC Music</span>
-    </div>
-    <div class="sidebar-nav">
-      <button class="nav-item active" data-page="search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span>搜索</span>
-      </button>
-      <button class="nav-item" data-page="downloads">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>下载</span>
-        <span class="nav-badge" id="dl-badge" style="display:none">0</span>
-      </button>
-      <button class="nav-item" data-page="library">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        <span>音乐库</span>
-      </button>
-      <button class="nav-item" data-page="settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>设置</span>
-      </button>
-    </div>
-    <div class="sidebar-footer">
-      <div class="dl-summary" id="dl-summary">
-        <div class="ds-label">全局下载速度</div>
-        <div class="ds-speed" id="global-speed">0 KB/s</div>
-        <div class="ds-bar"><div class="ds-fill" id="global-fill" style="width:0%"></div></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; report-uri csp-report;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FLAC Music</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="platform-unknown">
+    <!-- ── 自定义标题栏（Windows 用） ─────────────────────────── -->
+    <div id="titlebar" class="titlebar win-only">
+      <div class="titlebar-drag">
+        <div class="titlebar-logo">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+          </svg>
+          FLAC Music
+        </div>
       </div>
-      <div class="version-info" id="version-info">v2.4.1</div>
-    </div>
-  </nav>
-
-  <!-- 内容区 -->
-  <main class="content-area">
-
-    <!-- ═══ 搜索页 ═══ -->
-    <div class="page active" id="page-search">
-      <div class="page-header">
-        <h1>搜索音乐</h1>
-        <p class="page-subtitle">搜索海量无损曲库，支持批量下载</p>
+      <div
+        id="theme-toggle-host"
+        style="margin-left: auto; margin-right: 8px; -webkit-app-region: no-drag"
+      ></div>
+      <div class="titlebar-ctrls">
+        <button class="tb-btn" id="tb-min" title="最小化" aria-label="最小化窗口">
+          <svg width="10" height="1" viewBox="0 0 10 1">
+            <line x1="0" y1="0.5" x2="10" y2="0.5" stroke="currentColor" stroke-width="1.2" />
+          </svg>
+        </button>
+        <button class="tb-btn" id="tb-max" title="最大化" aria-label="最大化窗口">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <rect
+              x="0.5"
+              y="0.5"
+              width="9"
+              height="9"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.2"
+            />
+          </svg>
+        </button>
+        <button class="tb-btn tb-close" id="tb-close" title="关闭" aria-label="关闭窗口">
+          <svg width="10" height="10" viewBox="0 0 10 10">
+            <line x1="0" y1="0" x2="10" y2="10" stroke="currentColor" stroke-width="1.4" />
+            <line x1="10" y1="0" x2="0" y2="10" stroke="currentColor" stroke-width="1.4" />
+          </svg>
+        </button>
       </div>
-      <div class="search-bar-wrap">
-        <div class="search-input-wrap">
-          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="search-input" class="search-input" placeholder="搜索歌手、专辑、歌曲名称…" autocomplete="off" />
-          <button class="search-clear" id="search-clear" style="display:none">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+
+    <!-- ── 主布局 ─────────────────────────────────────────────── -->
+    <div class="app-layout">
+      <!-- 侧边栏 -->
+      <nav class="sidebar" id="sidebar" aria-label="主导航">
+        <div class="sidebar-logo mac-only">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+          </svg>
+          <span>FLAC Music</span>
+        </div>
+        <div class="sidebar-nav" role="navigation">
+          <button class="nav-item active" data-page="search" aria-current="page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span>搜索</span>
+          </button>
+          <button class="nav-item" data-page="downloads">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>下载</span>
+            <span class="nav-badge" id="dl-badge" style="display: none" aria-label="0 个活动下载"
+              >0</span
+            >
+          </button>
+          <button class="nav-item" data-page="library">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+            <span>音乐库</span>
+          </button>
+          <button class="nav-item" data-page="settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3" />
+              <path
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+              />
+            </svg>
+            <span>设置</span>
           </button>
         </div>
-        <button class="search-btn" id="search-btn">搜索</button>
-      </div>
-
-      <!-- 快捷标签 -->
-      <div class="quick-tags" id="quick-tags">
-        <span class="tag-label">热门：</span>
-        <button class="quick-tag" data-q="周杰伦">周杰伦</button>
-        <button class="quick-tag" data-q="邓紫棋">邓紫棋</button>
-        <button class="quick-tag" data-q="陈奕迅">陈奕迅</button>
-        <button class="quick-tag" data-q="Taylor Swift">Taylor Swift</button>
-        <button class="quick-tag" data-q="林俊杰">林俊杰</button>
-      </div>
-
-      <!-- 搜索结果 -->
-      <div class="result-toolbar" id="result-toolbar" style="display:none">
-        <div class="result-info">
-          找到 <strong id="result-count">0</strong> 首匹配歌曲
-          <span class="source-badge" id="source-badge"></span>
-        </div>
-        <div class="result-actions">
-          <button class="btn-ghost" id="select-all-btn">全选</button>
-          <button class="btn-ghost" id="deselect-btn">取消全选</button>
-          <button class="btn-primary" id="batch-dl-btn" disabled>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            批量下载 (<span id="selected-count">0</span>)
-          </button>
-        </div>
-      </div>
-
-      <!-- 列表 -->
-      <div class="track-list-wrap">
-        <div id="search-placeholder" class="list-placeholder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="56" height="56"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <p>输入关键词开始搜索</p>
-          <small>支持 FLAC、WAV、MP3、AAC、APE、DSD 格式</small>
-        </div>
-        <div id="search-loading" class="list-placeholder" style="display:none">
-          <div class="spinner"></div>
-          <p>正在搜索…</p>
-        </div>
-        <div id="track-list" class="track-list" style="display:none">
-          <div class="track-list-header">
-            <div class="th-check"><input type="checkbox" id="th-check-all" /></div>
-            <div class="th-num">#</div>
-            <div class="th-title">歌曲</div>
-            <div class="th-fmt">格式</div>
-            <div class="th-quality">音质</div>
-            <div class="th-size">大小</div>
-            <div class="th-dur">时长</div>
-            <div class="th-action">操作</div>
+        <div class="sidebar-footer">
+          <div class="dl-summary" id="dl-summary">
+            <div class="ds-label">全局下载速度</div>
+            <div class="ds-speed" id="global-speed">0 KB/s</div>
+            <div class="ds-bar"><div class="ds-fill" id="global-fill" style="width: 0%"></div></div>
           </div>
-          <div id="track-rows"></div>
+          <div class="version-info" id="version-info">v2.4.1</div>
         </div>
-      </div>
-    </div>
+      </nav>
 
-    <!-- ═══ 下载页 ═══ -->
-    <div class="page" id="page-downloads">
-      <div class="page-header">
-        <h1>下载任务</h1>
-        <div class="header-actions">
-          <button class="btn-ghost" id="pause-all-btn">全部暂停</button>
-          <button class="btn-ghost" id="resume-all-btn">全部恢复</button>
-          <button class="btn-ghost danger" id="clear-done-btn">清空已完成</button>
-          <button class="btn-ghost" id="open-dir-btn">打开目录</button>
-        </div>
-      </div>
-
-      <!-- 状态栏 -->
-      <div class="dl-stats-bar">
-        <div class="dl-stat"><span class="stat-n" id="stat-active">0</span><span class="stat-l">下载中</span></div>
-        <div class="dl-stat"><span class="stat-n" id="stat-queued">0</span><span class="stat-l">等待中</span></div>
-        <div class="dl-stat"><span class="stat-n" id="stat-done">0</span><span class="stat-l">已完成</span></div>
-        <div class="dl-stat"><span class="stat-n" id="stat-failed">0</span><span class="stat-l">失败</span></div>
-        <div class="dl-stat speed-stat"><span class="stat-n" id="stat-speed">0 KB/s</span><span class="stat-l">当前速度</span></div>
-      </div>
-
-      <!-- 任务列表 -->
-      <div id="dl-list-wrap">
-        <div id="dl-placeholder" class="list-placeholder">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="56" height="56"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <p>暂无下载任务</p>
-          <small>在搜索页选择歌曲并批量下载</small>
-        </div>
-        <div id="dl-task-list" class="dl-task-list" style="display:none"></div>
-      </div>
-    </div>
-
-    <!-- ═══ 音乐库页 ═══ -->
-    <div class="page" id="page-library">
-      <div class="page-header">
-        <h1>本地音乐库</h1>
-        <button class="btn-ghost" id="lib-open-dir">打开目录</button>
-      </div>
-      <div class="library-empty" id="lib-placeholder">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="56" height="56"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-        <p>尚无已下载文件</p>
-        <small>完成下载后文件将自动整理到此目录</small>
-        <button class="btn-primary" style="margin-top:20px" id="lib-go-search">去搜索下载</button>
-      </div>
-      <div id="lib-grid" class="lib-grid" style="display:none"></div>
-    </div>
-
-    <!-- ═══ 设置页 ═══ -->
-    <div class="page" id="page-settings">
-      <div class="page-header">
-        <h1>设置</h1>
-      </div>
-      <div class="settings-body">
-
-        <div class="settings-section">
-          <div class="settings-section-title">下载设置</div>
-          <div class="settings-group">
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-label">下载目录</div>
-                <div class="setting-desc" id="dl-dir-display">~/Music</div>
-              </div>
-              <button class="btn-ghost" id="change-dir-btn">更改</button>
+      <!-- 内容区 -->
+      <main class="content-area" role="main">
+        <!-- ═══ 搜索页 ═══ -->
+        <div class="page active" id="page-search">
+          <div class="page-header">
+            <h1>搜索音乐</h1>
+            <p class="page-subtitle">搜索海量无损曲库，支持批量下载</p>
+          </div>
+          <div class="search-bar-wrap">
+            <div class="search-input-wrap">
+              <svg
+                class="search-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                id="search-input"
+                class="search-input"
+                placeholder="搜索歌手、专辑、歌曲名称…"
+                autocomplete="off"
+                aria-label="搜索关键词"
+              />
+              <button class="search-clear" id="search-clear" style="display: none">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-label">最大并发数</div>
-                <div class="setting-desc">同时下载的任务数量</div>
-              </div>
-              <select id="max-concurrent" class="setting-select">
-                <option value="1">1 个</option>
-                <option value="2">2 个</option>
-                <option value="3" selected>3 个（推荐）</option>
-                <option value="5">5 个</option>
-                <option value="8">8 个</option>
-              </select>
+            <button class="search-btn" id="search-btn">搜索</button>
+          </div>
+
+          <!-- 快捷标签 -->
+          <div class="quick-tags" id="quick-tags">
+            <span class="tag-label">热门：</span>
+            <button class="quick-tag" data-q="周杰伦">周杰伦</button>
+            <button class="quick-tag" data-q="邓紫棋">邓紫棋</button>
+            <button class="quick-tag" data-q="陈奕迅">陈奕迅</button>
+            <button class="quick-tag" data-q="Taylor Swift">Taylor Swift</button>
+            <button class="quick-tag" data-q="林俊杰">林俊杰</button>
+          </div>
+
+          <!-- 搜索结果 -->
+          <div class="result-toolbar" id="result-toolbar" style="display: none">
+            <div class="result-info">
+              找到 <strong id="result-count">0</strong> 首匹配歌曲
+              <span class="source-badge" id="source-badge"></span>
             </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-label">默认格式</div>
-                <div class="setting-desc">新添加任务的默认音频格式</div>
-              </div>
-              <select id="default-format" class="setting-select">
-                <option value="FLAC">FLAC（无损）</option>
-                <option value="WAV">WAV（无压缩）</option>
-                <option value="MP3">MP3（高压缩）</option>
-                <option value="AAC">AAC</option>
-                <option value="APE">APE（无损）</option>
-                <option value="DSD">DSD（超高清）</option>
-              </select>
+            <div class="result-actions">
+              <button class="btn-ghost" id="select-all-btn">全选</button>
+              <button class="btn-ghost" id="deselect-btn">取消全选</button>
+              <button class="btn-primary" id="batch-dl-btn" disabled>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  width="14"
+                  height="14"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                批量下载 (<span id="selected-count">0</span>)
+              </button>
             </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-label">默认音质</div>
-                <div class="setting-desc">下载质量偏好</div>
+          </div>
+
+          <!-- 列表 -->
+          <div class="track-list-wrap">
+            <div id="search-placeholder" class="list-placeholder">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                width="56"
+                height="56"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <p>输入关键词开始搜索</p>
+              <small>支持 FLAC、WAV、MP3、AAC、APE、DSD 格式</small>
+            </div>
+            <div id="search-loading" class="list-placeholder" style="display: none">
+              <div class="spinner"></div>
+              <p>正在搜索…</p>
+            </div>
+            <div id="track-list" class="track-list" style="display: none">
+              <div class="track-list-header">
+                <div class="th-check"><input type="checkbox" id="th-check-all" /></div>
+                <div class="th-num">#</div>
+                <div class="th-title">歌曲</div>
+                <div class="th-fmt">格式</div>
+                <div class="th-quality">音质</div>
+                <div class="th-size">大小</div>
+                <div class="th-dur">时长</div>
+                <div class="th-action">操作</div>
               </div>
-              <select id="default-quality" class="setting-select">
-                <option value="24bit/192kHz">24bit/192kHz（最高）</option>
-                <option value="24bit/96kHz" selected>24bit/96kHz（推荐）</option>
-                <option value="16bit/44.1kHz">16bit/44.1kHz（标准）</option>
-                <option value="320kbps">320kbps（MP3 最高）</option>
-                <option value="256kbps">256kbps</option>
-                <option value="128kbps">128kbps</option>
-              </select>
+              <div id="track-rows"></div>
             </div>
           </div>
         </div>
 
-        <div class="settings-section">
-          <div class="settings-section-title">文件管理</div>
-          <div class="settings-group">
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-label">自动归类整理</div>
-                <div class="setting-desc">按「艺人/专辑」自动创建子目录</div>
-              </div>
-              <label class="toggle">
-                <input type="checkbox" id="auto-organize" checked />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
+        <!-- ═══ 下载页 ═══ -->
+        <div class="page" id="page-downloads">
+          <div class="page-header">
+            <h1>下载任务</h1>
+            <div class="header-actions">
+              <button class="btn-ghost" id="group-toggle-btn" title="切换分组视图">
+                📊 分组视图
+              </button>
+              <button class="btn-ghost" id="pause-all-btn">全部暂停</button>
+              <button class="btn-ghost" id="resume-all-btn">全部恢复</button>
+              <button class="btn-ghost danger" id="clear-done-btn">清空已完成</button>
+              <button class="btn-ghost" id="open-dir-btn">打开目录</button>
             </div>
-            <div class="setting-row">
-              <div class="setting-info">
-                <div class="setting-label">自动写入元数据</div>
-                <div class="setting-desc">下载完成后自动嵌入封面、标题、艺人等 ID3 标签</div>
-              </div>
-              <label class="toggle">
-                <input type="checkbox" id="auto-metadata" checked />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-              </label>
+          </div>
+
+          <!-- 状态栏 -->
+          <div class="dl-stats-bar">
+            <div class="dl-stat">
+              <span class="stat-n" id="stat-active">0</span><span class="stat-l">下载中</span>
             </div>
+            <div class="dl-stat">
+              <span class="stat-n" id="stat-queued">0</span><span class="stat-l">等待中</span>
+            </div>
+            <div class="dl-stat">
+              <span class="stat-n" id="stat-done">0</span><span class="stat-l">已完成</span>
+            </div>
+            <div class="dl-stat">
+              <span class="stat-n" id="stat-failed">0</span><span class="stat-l">失败</span>
+            </div>
+            <div class="dl-stat speed-stat">
+              <span class="stat-n" id="stat-speed">0 KB/s</span><span class="stat-l">当前速度</span>
+            </div>
+          </div>
+
+          <!-- 任务列表 -->
+          <div id="dl-list-wrap">
+            <div id="dl-placeholder" class="list-placeholder">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+                width="56"
+                height="56"
+              >
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              <p>暂无下载任务</p>
+              <small>在搜索页选择歌曲并批量下载</small>
+            </div>
+            <div id="dl-task-list" class="dl-task-list" style="display: none"></div>
           </div>
         </div>
 
-        <div class="settings-section">
-          <div class="settings-section-title">关于</div>
-          <div class="settings-group">
-            <div class="about-card">
-              <div class="about-logo">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>
-              </div>
-              <div class="about-info">
-                <div class="about-name">FLAC Music</div>
-                <div class="about-ver" id="about-version">v2.4.1</div>
-                <div class="about-links">
-                  <a href="#" id="link-website">官方网站</a>
-                  <span>·</span>
-                  <a href="#" id="link-update">检查更新</a>
+        <!-- ═══ 音乐库页 ═══ -->
+        <div class="page" id="page-library">
+          <div class="page-header">
+            <h1>本地音乐库</h1>
+            <button class="btn-ghost" id="lib-open-dir">打开目录</button>
+          </div>
+          <div class="library-empty" id="lib-placeholder">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              width="56"
+              height="56"
+            >
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+            <p>尚无已下载文件</p>
+            <small>完成下载后文件将自动整理到此目录</small>
+            <button class="btn-primary" style="margin-top: 20px" id="lib-go-search">
+              去搜索下载
+            </button>
+          </div>
+          <div id="lib-grid" class="lib-grid" style="display: none"></div>
+        </div>
+
+        <!-- ═══ 设置页 ═══ -->
+        <div class="page" id="page-settings">
+          <div class="page-header">
+            <h1>设置</h1>
+          </div>
+          <div class="settings-body">
+            <div class="settings-section">
+              <div class="settings-section-title">下载设置</div>
+              <div class="settings-group">
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">下载目录</div>
+                    <div class="setting-desc" id="dl-dir-display">~/Music</div>
+                  </div>
+                  <button class="btn-ghost" id="change-dir-btn">更改</button>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">最大并发数</div>
+                    <div class="setting-desc">同时下载的任务数量</div>
+                  </div>
+                  <select id="max-concurrent" class="setting-select">
+                    <option value="1">1 个</option>
+                    <option value="2">2 个</option>
+                    <option value="3" selected>3 个（推荐）</option>
+                    <option value="5">5 个</option>
+                    <option value="8">8 个</option>
+                  </select>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">默认格式</div>
+                    <div class="setting-desc">新添加任务的默认音频格式</div>
+                  </div>
+                  <select id="default-format" class="setting-select">
+                    <option value="FLAC">FLAC（无损）</option>
+                    <option value="WAV">WAV（无压缩）</option>
+                    <option value="MP3">MP3（高压缩）</option>
+                    <option value="AAC">AAC</option>
+                    <option value="APE">APE（无损）</option>
+                    <option value="DSD">DSD（超高清）</option>
+                  </select>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">默认音质</div>
+                    <div class="setting-desc">下载质量偏好</div>
+                  </div>
+                  <select id="default-quality" class="setting-select">
+                    <option value="24bit/192kHz">24bit/192kHz（最高）</option>
+                    <option value="24bit/96kHz" selected>24bit/96kHz（推荐）</option>
+                    <option value="16bit/44.1kHz">16bit/44.1kHz（标准）</option>
+                    <option value="320kbps">320kbps（MP3 最高）</option>
+                    <option value="256kbps">256kbps</option>
+                    <option value="128kbps">128kbps</option>
+                  </select>
                 </div>
               </div>
-              <div class="platform-badge" id="platform-badge">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="platform-icon">
-                  <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.851"/>
-                </svg>
-                <span id="platform-name">Windows</span>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-title">文件管理</div>
+              <div class="settings-group">
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">自动归类整理</div>
+                    <div class="setting-desc">按「艺人/专辑」自动创建子目录</div>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="auto-organize" checked />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  </label>
+                </div>
+                <div class="setting-row">
+                  <div class="setting-info">
+                    <div class="setting-label">自动写入元数据</div>
+                    <div class="setting-desc">下载完成后自动嵌入封面、标题、艺人等 ID3 标签</div>
+                  </div>
+                  <label class="toggle">
+                    <input type="checkbox" id="auto-metadata" checked />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-section">
+              <div class="settings-section-title">关于</div>
+              <div class="settings-group">
+                <div class="about-card">
+                  <div class="about-logo">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z" />
+                    </svg>
+                  </div>
+                  <div class="about-info">
+                    <div class="about-name">FLAC Music</div>
+                    <div class="about-ver" id="about-version">v2.4.1</div>
+                    <div class="about-links">
+                      <a href="#" id="link-website">官方网站</a>
+                      <span>·</span>
+                      <a href="#" id="link-update">检查更新</a>
+                    </div>
+                  </div>
+                  <div class="platform-badge" id="platform-badge">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      id="platform-icon"
+                    >
+                      <path
+                        d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.851"
+                      />
+                    </svg>
+                    <span id="platform-name">Windows</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </main>
+    </div>
 
+    <!-- ── 关闭确认对话框 ─────────────────────────────────────── -->
+    <div
+      class="modal-overlay"
+      id="modal-close"
+      style="display: none"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      <div class="modal">
+        <div class="modal-title" id="modal-title">退出确认</div>
+        <div class="modal-body" id="modal-close-msg">
+          仍有 <strong>3</strong> 个下载任务正在进行，退出后任务将中断。
+        </div>
+        <div class="modal-actions">
+          <button class="btn-ghost" id="modal-cancel-btn">取消</button>
+          <button class="btn-danger" id="modal-quit-btn">强制退出</button>
+        </div>
       </div>
     </div>
 
-  </main>
-</div>
+    <!-- Toast (屏幕阅读器自动播报) -->
+    <div class="toast-container" id="toast-container" role="status" aria-live="polite"></div>
 
-<!-- ── 关闭确认对话框 ─────────────────────────────────────── -->
-<div class="modal-overlay" id="modal-close" style="display:none">
-  <div class="modal">
-    <div class="modal-title">退出确认</div>
-    <div class="modal-body" id="modal-close-msg">仍有 <strong>3</strong> 个下载任务正在进行，退出后任务将中断。</div>
-    <div class="modal-actions">
-      <button class="btn-ghost" id="modal-cancel-btn">取消</button>
-      <button class="btn-danger" id="modal-quit-btn">强制退出</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div class="toast-container" id="toast-container"></div>
-
-<script src="app.js"></script>
-</body>
+    <script type="module" src="app.js"></script>
+  </body>
 </html>
