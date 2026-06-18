@@ -1,0 +1,75 @@
+# Dependabot 配置
+# 自动扫描依赖更新, 每周一北京时间上午 9:00 (UTC 01:00) 提交 PR
+# 详细文档: https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # ── npm 依赖 ────────────────────────────────────────────
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '01:00'
+      timezone: 'UTC'
+    # 限制单周最多 5 个 PR, 避免噪音
+    open-pull-requests-limit: 5
+    # 分组: 同一类更新合并为 1 个 PR, 减少 PR 数量
+    groups:
+      electron-and-builder:
+        patterns:
+          - 'electron'
+          - 'electron-builder'
+        update-types:
+          - 'minor'
+          - 'patch'
+      linting-and-formatting:
+        patterns:
+          - 'eslint'
+          - 'prettier'
+          - 'husky'
+          - '@commitlint/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+      testing-and-release:
+        patterns:
+          - 'release-it'
+          - '@release-it/*'
+          - 'size-limit'
+          - '@size-limit/*'
+        update-types:
+          - 'minor'
+          - 'patch'
+    # 自动给 PR 加标签, 便于 CODEOWNER 自动审阅
+    labels:
+      - 'dependencies'
+      - 'auto-update'
+    # 提交者: 团队 bot
+    commit-message:
+      prefix: 'chore'
+      prefix-development: 'chore(dev)'
+      include: 'scope'
+    # 忽略 major 升级 (人工评审)
+    ignore:
+      - dependency-name: 'electron'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'electron-builder'
+        update-types: ['version-update:semver-major']
+
+  # ── GitHub Actions ──────────────────────────────────────
+  - package-ecosystem: 'github-actions'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+      day: 'monday'
+      time: '01:00'
+      timezone: 'UTC'
+    open-pull-requests-limit: 3
+    labels:
+      - 'dependencies'
+      - 'ci'
+      - 'auto-update'
+    commit-message:
+      prefix: 'ci'
+      include: 'scope'

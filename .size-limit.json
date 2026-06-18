@@ -1,0 +1,27 @@
+[
+  {
+    "name": "主进程入口 (src/main/index.js)",
+    "path": "src/main/index.js",
+    "limit": "10 KB"
+  },
+  {
+    "name": "渲染进程入口 (app.js)",
+    "path": "src/renderer/app.js",
+    "limit": "10 KB"
+  },
+  {
+    "name": "渲染进程 core 模块汇总",
+    "path": "src/renderer/core/**/*.js",
+    "limit": "60 KB"
+  },
+  {
+    "name": "渲染进程全部 (无压缩)",
+    "path": "src/renderer/**/*.js",
+    "limit": "200 KB"
+  },
+  {
+    "name": "主进程全部 (无压缩)",
+    "path": "src/main/**/*.js",
+    "limit": "100 KB"
+  }
+]

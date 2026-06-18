@@ -1,0 +1,28 @@
+{
+  "all": false,
+  "include": [
+    "src/main/**/*.js",
+    "src/renderer/core/**/*.js"
+  ],
+  "exclude": [
+    "src/main/index.js",
+    "src/main/updater.js",
+    "src/main/window.js",
+    "src/main/menu.js",
+    "src/main/ipc.js",
+    "src/main/library.js",
+    "src/main/search.js",
+    "src/main/telemetry.js",
+    "src/renderer/app.js",
+    "src/renderer/pages/**/*.js",
+    "src/renderer/components/**/*.js"
+  ],
+  "reporter": ["text", "lcov", "html"],
+  "reports-dir": "coverage",
+  "check-coverage": true,
+  "lines": 70,
+  "functions": 55,
+  "branches": 60,
+  "skip-full": false,
+  "clean": true
+}

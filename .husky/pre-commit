@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# Husky pre-commit hook
+# 提交前自动跑 lint + format check + test
+# 任意失败则阻止提交
+
+set -e
+
+echo "→ format check"
+npm run format:check
+echo "→ lint"
+npm run lint
+echo "→ test"
+npm test

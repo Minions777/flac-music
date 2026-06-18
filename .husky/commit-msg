@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Husky commit-msg hook
+# 提交时跑 commitlint, 校验 message 格式
+
+set -e
+
+npx --no -- commitlint --edit "$1"

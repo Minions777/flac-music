@@ -1,0 +1,112 @@
+{
+  "app": {
+    "name": "FLAC Music",
+    "version": "版本"
+  },
+  "nav": {
+    "search": "搜索",
+    "downloads": "下载",
+    "library": "音乐库",
+    "settings": "设置"
+  },
+  "search": {
+    "title": "搜索音乐",
+    "subtitle": "搜索海量无损曲库，支持批量下载",
+    "placeholder": "搜索歌手、专辑、歌曲名称…",
+    "button": "搜索",
+    "loading": "正在搜索…",
+    "empty": "输入关键词开始搜索",
+    "emptyHint": "支持 FLAC、WAV、MP3、AAC、APE、DSD 格式",
+    "resultCount": "找到 {n} 首匹配歌曲",
+    "sourceDemo": "演示数据",
+    "sourceOnline": "在线搜索",
+    "selectAll": "全选",
+    "deselectAll": "取消全选",
+    "batchDownload": "批量下载 ({n})"
+  },
+  "downloads": {
+    "title": "下载任务",
+    "empty": "暂无下载任务",
+    "emptyHint": "在搜索页选择歌曲并批量下载",
+    "pauseAll": "全部暂停",
+    "resumeAll": "全部恢复",
+    "clearDone": "清空已完成",
+    "openDir": "打开目录",
+    "stats": {
+      "active": "下载中",
+      "queued": "等待中",
+      "done": "已完成",
+      "failed": "失败",
+      "speed": "当前速度"
+    },
+    "actions": {
+      "pause": "暂停",
+      "resume": "继续",
+      "retry": "重试",
+      "cancel": "取消",
+      "reveal": "在文件夹中显示"
+    },
+    "status": {
+      "downloading": "下载中",
+      "queued": "等待中",
+      "done": "已完成",
+      "failed": "失败",
+      "paused": "已暂停"
+    },
+    "toast": {
+      "pausedAll": "已暂停所有任务",
+      "resumedAll": "已恢复所有任务"
+    }
+  },
+  "library": {
+    "title": "本地音乐库",
+    "openDir": "打开目录",
+    "empty": "尚无已下载文件",
+    "emptyHint": "完成下载后文件将自动整理到此目录",
+    "goSearch": "去搜索下载"
+  },
+  "settings": {
+    "title": "设置",
+    "download": "下载设置",
+    "downloadDir": "下载目录",
+    "changeDir": "更改",
+    "maxConcurrent": "最大并发数",
+    "maxConcurrentDesc": "同时下载的任务数量",
+    "defaultFormat": "默认格式",
+    "defaultFormatDesc": "新添加任务的默认音频格式",
+    "defaultQuality": "默认音质",
+    "defaultQualityDesc": "下载质量偏好",
+    "fileMgmt": "文件管理",
+    "autoOrganize": "自动归类整理",
+    "autoOrganizeDesc": "按「艺人/专辑」自动创建子目录",
+    "autoMetadata": "自动写入元数据",
+    "autoMetadataDesc": "下载完成后自动嵌入封面、标题、艺人等 ID3 标签",
+    "about": "关于",
+    "checkUpdate": "检查更新",
+    "officialSite": "官方网站",
+    "language": "界面语言"
+  },
+  "toast": {
+    "searchFailed": "搜索失败：{err}",
+    "downloadFailed": "添加下载失败：{err}",
+    "queuedN": "已添加 {n} 首到下载队列",
+    "downloadedOne": "「{title}」下载完成",
+    "globalError": "发生错误, 请查看日志",
+    "unhandled": "发生未处理异常, 请查看日志"
+  },
+  "modal": {
+    "closeTitle": "退出确认",
+    "closeMsg": "仍有 {n} 个下载任务正在进行, 退出后任务将中断。",
+    "cancel": "取消",
+    "forceQuit": "强制退出"
+  },
+  "titlebar": {
+    "min": "最小化",
+    "max": "最大化",
+    "close": "关闭"
+  },
+  "globalSpeed": "全局下载速度",
+  "telemetry": {
+    "banner": "⚠ 与主进程通信断开 — 部分功能可能不可用, 请重启应用"
+  }
+}
