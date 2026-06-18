@@ -41,7 +41,7 @@
     "husky": "^9.0.0",
     "prettier": "^3.0.0",
     "release-it": "^17.0.0",
-    "size-limit": "^11.0.0"
+    "size-limit": "^12.1.0"
   },
   "build": {
     "appId": "cn.music.hi.flac",
