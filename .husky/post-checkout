@@ -1,0 +1,8 @@
+#!/bin/sh
+# 自动修复 NTFS TSD-Header 透明加密导致的文件损坏
+# 仅在 Windows 环境下运行
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    node scripts/fix-tsd-header.js 2>/dev/null || true
+    ;;
+esac
