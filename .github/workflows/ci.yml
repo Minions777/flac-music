@@ -30,7 +30,7 @@ jobs:
           fetch-depth: 1
 
       - name: Setup Node ${{ matrix.node }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node }}
           # 关键优化: 按 package-lock.json 哈希缓存 node_modules
