@@ -24,7 +24,7 @@ jobs:
         node: [20, 22]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # 浅克隆，显著加速 checkout
           fetch-depth: 1
